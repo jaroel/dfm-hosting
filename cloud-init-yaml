@@ -1,0 +1,30 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+package_reboot_if_required: true
+
+locale: en_US.UTF-8
+timezone: Europe/Amsterdam
+
+packages:
+  - htop
+  - neovim
+
+users:
+  - name: traefik
+  - name: dfmsite
+
+runcmd:
+  # Add Docker's official GPG key:
+  - apt-get install -y ca-certificates curl
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  # Add the repository to Apt sources:
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update
+  # Install Docker Engine
+  - sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  # Run Docker on boot
+  - systemctl enable docker.service
+  - systemctl start docker.service
