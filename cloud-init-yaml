@@ -10,10 +10,6 @@ packages:
   - htop
   - neovim
 
-users:
-  - name: traefik
-  - name: dfmsite
-
 runcmd:
   # Add Docker's official GPG key:
   - apt-get install -y ca-certificates curl

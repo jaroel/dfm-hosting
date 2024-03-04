@@ -1,6 +1,7 @@
 https://docs.docker.com/engine/install/debian/
 
 orbctl delete debian && orbctl create -a arm64 debian:bookworm debian -u roel -c cloud-init-yaml && ssh root@debian@orb
+orbctl delete debian && orbctl create -a arm64 debian:bookworm debian -u roel -c cloud-init-yaml
 
 orbctl delete debian
 orbctl list
