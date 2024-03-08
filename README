@@ -1,23 +1,13 @@
-https://docs.docker.com/engine/install/debian/
+https://jameskiefer.com/posts/manage-a-docker-container-on-an-ubuntu-vm-using-just-cloud-init/
+https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md
 
-orbctl delete debian && orbctl create -a arm64 debian:bookworm debian -u roel -c cloud-init-yaml && ssh root@debian@orb
-orbctl delete debian && orbctl create -a arm64 debian:bookworm debian -u roel -c cloud-init-yaml
-
-orbctl delete debian
-orbctl list
-orbctl create -a arm64 debian:bookworm debian -u roel -c cloud-init-yaml
-ssh debian@orb
-
+orbctl delete fedora && orbctl create -a arm64 fedora fedora -u roel -c ./cloud-init-fedora.yaml && ssh root@fedora@orb
 
 cloud-init status
 tail /var/log/cloud-init.log
 tail /var/log/cloud-init-output.log
 
+# docker build --platform linux/amd64 -t dfmsite:latest .
 
-
-docker build --platform linux/amd64 -t dfmsite:latest .
-
-docker image save dfmsite:latest -o dfmsite.tar
-docker image load -i dfmsite.tar
-
-docker save dfmsite:latest | bzip2 | pv | ssh root@www-dinxperfm-nl.toffe.site docker load
+docker save dfmsite:latest | bzip2 | pv | ssh root@www-dinxperfm-nl.toffe.site podman load
+docker save dfmuzg:latest | bzip2 | pv | ssh root@fedora@orb podman load

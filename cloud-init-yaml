@@ -9,18 +9,109 @@ timezone: Europe/Amsterdam
 packages:
   - htop
   - neovim
+  - podman
+  - nginx
+
+write_files:
+  - path: /etc/nginx/nginx.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      user nginx;
+      worker_processes auto;
+      error_log /var/log/nginx/error.log notice;
+      pid /run/nginx.pid;
+
+      include /usr/share/nginx/modules/*.conf;
+
+      events {
+          worker_connections 1024;
+      }
+
+      http {
+          log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                            '$status $body_bytes_sent "$http_referer" '
+                            '"$http_user_agent" "$http_x_forwarded_for"';
+
+          access_log  /var/log/nginx/access.log  main;
+
+          sendfile            on;
+          tcp_nopush          on;
+          keepalive_timeout   65;
+          types_hash_max_size 4096;
+
+          include             /etc/nginx/mime.types;
+          default_type        application/octet-stream;
+
+          server {
+              listen 80 default_server;
+              server_name _;
+              return 404;
+          }
+          include /etc/nginx/conf.d/*.conf;
+      }
+  - path: /etc/nginx/conf.d/dfmuzg.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      server {
+        listen 80;
+        listen [::]:80;
+        server_name "uzg.fedora.orb.local";
+
+        location / {
+          proxy_pass http://localhost:8000;
+        }
+      }
+
+  - path: /etc/nginx/conf.d/dfmsite.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      server {
+        listen 80;
+        listen [::]:80;
+        server_name "site.fedora.orb.local";
+
+        location / {
+          proxy_pass http://localhost:3000;
+        }
+      }
+
+  - path: /etc/systemd/system/dfmuzg.service
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=DinxperFM - Uitzending gemist
+
+      [Install]
+      WantedBy=multi-user.target
+
+      [Service]
+      Restart=no
+      ExecStartPre=-podman rm dfmuzg
+      ExecStart=podman run --rm --name dfmuzg -p 127.0.0.1:8000:8000 docker.io/dfmuzg python -m uvicorn server:app --host=0.0.0.0 --port=8000
+      ExecStop=podman stop -t 2 dfmuzg
+
+  - path: /etc/systemd/system/dfmsite.service
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=DinxperFM - Website
+
+      [Install]
+      WantedBy=multi-user.target
+
+      [Service]
+      Restart=no
+      ExecStartPre=-podman rm dfmsite
+      ExecStart=podman run --rm --name dfmsite -p 127.0.0.1:3000:3000 --env 'PORT=3000' --env 'HOST=0.0.0.0' docker.io/dfmsite
+      ExecStop=podman stop -t 2 dfmsite
 
 runcmd:
-  # Add Docker's official GPG key:
-  - apt-get install -y ca-certificates curl
-  - install -m 0755 -d /etc/apt/keyrings
-  - curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-  - chmod a+r /etc/apt/keyrings/docker.asc
-  # Add the repository to Apt sources:
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
-  - apt-get update
-  # Install Docker Engine
-  - sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  # Run Docker on boot
-  - systemctl enable docker.service
-  - systemctl start docker.service
+  - systemctl enable nginx
+  - systemctl start nginx
+  - systemctl enable dfmuzg
+  - systemctl enable dfmsite
