@@ -7,8 +7,6 @@ locale: en_US.UTF-8
 timezone: Europe/Amsterdam
 
 packages:
-  - htop
-  - neovim
   - podman
   - nginx
 
@@ -45,56 +43,33 @@ write_files:
 
           server {
               listen 80 default_server;
+              listen [::]:80 default_server;
               server_name _;
               return 404;
           }
-          include /etc/nginx/conf.d/*.conf;
-      }
-  - path: /etc/nginx/conf.d/dfmuzg.conf
-    owner: root:root
-    permissions: "0644"
-    content: |
-      server {
-        listen 80;
-        listen [::]:80;
-        server_name "uzg.fedora.orb.local";
 
-        location / {
-          proxy_pass http://localhost:8000;
-        }
-      }
+          server {
+            listen 80;
+            listen [::]:80;
+            server_name "stream-dinxperfm-nl.toffe.site";
 
-  - path: /etc/nginx/conf.d/dfmsite.conf
-    owner: root:root
-    permissions: "0644"
-    content: |
-      server {
-        listen 80;
-        listen [::]:80;
-        server_name "site.fedora.orb.local";
+            location / {
+              proxy_pass http://dinxperfm.freeddns.org:8082;
+            }
+          }
 
-        location / {
-          proxy_pass http://localhost:3000;
-        }
+          server {
+            listen 80;
+            listen [::]:80;
+            server_name "www-dinxperfm-nl.toffe.site";
+
+            location / {
+              proxy_pass http://127.0.0.1:3000;
+            }
+          }
       }
 
-  - path: /etc/systemd/system/dfmuzg.service
-    owner: root:root
-    permissions: "0755"
-    content: |
-      [Unit]
-      Description=DinxperFM - Uitzending gemist
-
-      [Install]
-      WantedBy=multi-user.target
-
-      [Service]
-      Restart=no
-      ExecStartPre=-podman rm dfmuzg
-      ExecStart=podman run --rm --name dfmuzg -p 127.0.0.1:8000:8000 docker.io/dfmuzg python -m uvicorn server:app --host=0.0.0.0 --port=8000
-      ExecStop=podman stop -t 2 dfmuzg
-
-  - path: /etc/systemd/system/dfmsite.service
+  - path: /etc/containers/systemd/dfmsite.container
     owner: root:root
     permissions: "0755"
     content: |
@@ -104,11 +79,13 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
-      [Service]
-      Restart=no
-      ExecStartPre=-podman rm dfmsite
-      ExecStart=podman run --rm --name dfmsite -p 127.0.0.1:3000:3000 --env 'PORT=3000' --env 'HOST=0.0.0.0' docker.io/dfmsite
-      ExecStop=podman stop -t 2 dfmsite
+      [Container]
+      ReadOnly=true
+      Image=docker.io/dfmsite
+      Exec=
+      Environment=PORT=3000
+      Environment=HOST=0.0.0.0
+      PublishPort=127.0.0.1:3000:3000
 
 runcmd:
   - systemctl enable nginx

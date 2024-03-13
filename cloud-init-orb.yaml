@@ -1,0 +1,150 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+package_reboot_if_required: true
+
+locale: en_US.UTF-8
+timezone: Europe/Amsterdam
+
+packages:
+  - htop
+  - neovim
+  - podman
+
+write_files:
+  - path: /etc/containers/networks/podman.json
+    owner: root:root
+    permissions: "0644"
+    content: |
+      {
+        "name": "podman",
+        "id": "2f259bab93aaaaa2542ba43ef33eb990d0999ee1b9924b557b7be53c0b7a1bb9",
+        "driver": "bridge",
+        "network_interface": "podman0",
+        "created": "2024-03-13T19:40:29.895534643+01:00",
+        "subnets": [
+          {
+            "subnet": "10.88.0.0/16",
+            "gateway": "10.88.0.1"
+          }
+        ],
+        "ipv6_enabled": false,
+        "internal": false,
+        "dns_enabled": true,
+        "ipam_options": {
+          "driver": "host-local"
+        }
+      }
+  - path: /etc/nginx/nginx.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      user nginx;
+      worker_processes auto;
+      error_log /var/log/nginx/error.log;
+      pid /run/nginx.pid;
+
+      include /usr/share/nginx/modules/*.conf;
+
+      events {
+          worker_connections 1024;
+      }
+
+      http {
+          log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                            '$status $body_bytes_sent "$http_referer" '
+                            '"$http_user_agent" "$http_x_forwarded_for"';
+
+          access_log  /var/log/nginx/access.log  main;
+
+          resolver 10.88.0.1;  # !! DNS server for podman network
+
+          sendfile            on;
+          tcp_nopush          on;
+          keepalive_timeout   65;
+          types_hash_max_size 4096;
+
+          include             /etc/nginx/mime.types;
+          default_type        application/octet-stream;
+
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              server_name _;
+              return 404;
+          }
+
+          # server {
+          #   listen 80;
+          #   listen [::]:80;
+          #   server_name "stream.fedora.orb.local";
+
+          #   location / {
+          #     set $upstream "http://dinxperfm.freeddns.org:8082";
+          #     proxy_pass $upstream;
+          #   }
+          # }
+
+          server {
+            listen 80;
+            listen [::]:80;
+            server_name "site.fedora.orb.local";
+            root /var/www/dfmsite/app/public;
+            index index.html;
+
+            location / {
+              try_files $uri $uri/index.html @backend;
+            }
+
+            location @backend  {
+              set $upstream "http://systemd-dfmsite.dns.podman:3000";
+              proxy_pass $upstream;
+            }
+          }
+      }
+
+  - path: /etc/containers/systemd/dfmsite.volume
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Volume]
+      Driver=image
+      Image=docker.io/dfmsite:latest
+
+  - path: /etc/containers/systemd/dfmsite.container
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=DinxperFM - Website
+
+      [Install]
+      WantedBy=multi-user.target
+
+      [Container]
+      Image=docker.io/dfmsite
+      Exec=
+      ReadOnly=true
+
+  - path: /etc/containers/systemd/nginx.container
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=nginx
+
+      [Install]
+      WantedBy=multi-user.target
+
+      [Container]
+      Image=docker.io/nginx
+      Exec=
+      PublishPort=80:80
+      PublishPort=443:443
+      Volume=/etc/nginx/nginx.conf:/etc/nginx/nginx.conf
+      Volume=dfmsite.volume:/var/www/dfmsite
+
+runcmd:
+  # - systemctl enable podman-auto-update.timer
+  - systemctl enable nginx
+  - systemctl enable dfmsite
