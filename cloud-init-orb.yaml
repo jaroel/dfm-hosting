@@ -74,16 +74,16 @@ write_files:
               return 404;
           }
 
-          # server {
-          #   listen 80;
-          #   listen [::]:80;
-          #   server_name "stream.fedora.orb.local";
+          server {
+            listen 80;
+            listen [::]:80;
+            server_name "stream.fedora.orb.local";
 
-          #   location / {
-          #     set $upstream "http://dinxperfm.freeddns.org:8082";
-          #     proxy_pass $upstream;
-          #   }
-          # }
+            location / {
+              set $upstream "http://dinxperfm.freeddns.org:8082";
+              proxy_pass $upstream;
+            }
+          }
 
           server {
             listen 80;
