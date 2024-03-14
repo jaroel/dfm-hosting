@@ -18,7 +18,10 @@ docker save dfmuzg:latest | bzip2 | pv | ssh root@fedora@orb podman load
 
 # Request new certificate
 alias certbot='podman run -it --rm --name certbot -v "/etc/letsencrypt:/etc/letsencrypt" -v "/var/lib/letsencrypt:/var/lib/letsencrypt" -v "/var/www/letsencrypt:/var/www/letsencrypt" certbot/certbot'
-certbot certonly --webroot -w /var/www/letsencrypt -d stream-dinxperfm-nl.toffe.site
+certbot certonly --webroot -w /var/www/letsencrypt -d www-dinxperfm-nl.toffe.site
+certbot certonly --webroot -w /var/www/letsencrypt -d uitzendinggemist-dinxperfm-nl.toffe.site
+certbot certonly --webroot -w /var/www/letsencrypt -d www-dfmfalk.toffe.site
 chmod -R 755 /etc/letsencrypt/{live,archive}
 
 /var/www/letsencrypt
+

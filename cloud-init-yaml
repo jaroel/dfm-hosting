@@ -62,12 +62,43 @@ write_files:
           types_hash_max_size 4096;
           include             /etc/nginx/mime.types;
           default_type        application/octet-stream;
+          gzip on;
+          gzip_types text/javascript text/css;
+          gzip_static on;
+          proxy_cache_path /data/nginx/cache keys_zone=dfmsite:10m;
 
           server {
               listen 80 default_server;
               listen [::]:80 default_server;
               server_name _;
               return 404;
+          }
+
+          server {
+            listen 80;
+            listen [::]:80;
+            server_name "uitzendinggemist-dinxperfm-nl.toffe.site";
+
+            location /.well-known/acme-challenge/ {
+              root /var/www/letsencrypt;
+            }
+
+            location / {
+                return 301 https://www-dinxperfm-nl.toffe.site;
+            }
+          }
+          server {
+            listen 443 ssl;
+            listen [::]:443 ssl;
+            http2 on;
+            server_name "uitzendinggemist-dinxperfm-nl.toffe.site";
+
+            ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
+            ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+
+            location / {
+                return 301 https://www-dinxperfm-nl.toffe.site;
+            }
           }
 
           server {
@@ -118,14 +149,9 @@ write_files:
             server_name "www-dinxperfm-nl.toffe.site";
             ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
-            root /var/www/dfmsite/app/public;
-            index index.html;
+            proxy_cache dfmsite;
 
             location / {
-              try_files $uri $uri/index.html @backend;
-            }
-
-            location @backend  {
               set $upstream "http://systemd-dfmsite.dns.podman:3000";
               proxy_pass $upstream;
             }
@@ -154,7 +180,6 @@ write_files:
     content: |
       [Unit]
       Description=nginx
-      PartOf=dfmsite.service
 
       [Install]
       WantedBy=multi-user.target
@@ -168,7 +193,6 @@ write_files:
       Volume=/etc/nginx/nginx.conf:/etc/nginx/nginx.conf
       Volume=/var/www/letsencrypt:/var/www/letsencrypt
       Volume=/etc/letsencrypt:/etc/letsencrypt:z,ro
-      Mount=type=image,src=docker.io/dfmsite:latest,dst=/var/www/dfmsite
 
 runcmd:
   - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt
