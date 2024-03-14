@@ -1,3 +1,6 @@
+# Push a new
+
+
 https://jameskiefer.com/posts/manage-a-docker-container-on-an-ubuntu-vm-using-just-cloud-init/
 https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md
 https://docs.podman.io/en/v4.6.0/markdown/podman-systemd.unit.5.html
@@ -12,3 +15,10 @@ tail /var/log/cloud-init-output.log
 
 docker save dfmsite:latest | bzip2 | pv | ssh root@www-dinxperfm-nl.toffe.site podman load
 docker save dfmuzg:latest | bzip2 | pv | ssh root@fedora@orb podman load
+
+# Request new certificate
+alias certbot='podman run -it --rm --name certbot -v "/etc/letsencrypt:/etc/letsencrypt" -v "/var/lib/letsencrypt:/var/lib/letsencrypt" -v "/var/www/letsencrypt:/var/www/letsencrypt" certbot/certbot'
+certbot certonly --webroot -w /var/www/letsencrypt -d stream-dinxperfm-nl.toffe.site
+chmod -R 755 /etc/letsencrypt/{live,archive}
+
+/var/www/letsencrypt

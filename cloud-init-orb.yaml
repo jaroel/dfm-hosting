@@ -103,15 +103,6 @@ write_files:
           }
       }
 
-  - path: /etc/containers/systemd/dfmsite.volume
-    owner: root:root
-    permissions: "0755"
-    content: |
-      [Volume]
-      Driver=image
-      Image=docker.io/dfmsite:latest
-      Copy=false
-
   - path: /etc/containers/systemd/dfmsite.container
     owner: root:root
     permissions: "0755"
