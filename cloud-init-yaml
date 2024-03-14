@@ -174,3 +174,5 @@ runcmd:
   - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt
   - systemctl enable nginx.service
   - systemctl enable dfmsite.service
+  - systemctl enable podman-auto-update.service
+  - systemctl enable podman-auto-update.timer
