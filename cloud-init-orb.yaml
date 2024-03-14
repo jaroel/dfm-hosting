@@ -110,6 +110,7 @@ write_files:
       [Volume]
       Driver=image
       Image=docker.io/dfmsite:latest
+      Copy=false
 
   - path: /etc/containers/systemd/dfmsite.container
     owner: root:root
@@ -122,7 +123,8 @@ write_files:
       WantedBy=multi-user.target
 
       [Container]
-      Image=docker.io/dfmsite
+      Image=docker.io/dfmsite:latest
+      AutoUpdate=local
       Exec=
       ReadOnly=true
 
@@ -132,19 +134,22 @@ write_files:
     content: |
       [Unit]
       Description=nginx
+      PartOf=dfmsite.service
 
       [Install]
       WantedBy=multi-user.target
 
       [Container]
       Image=docker.io/nginx
+      AutoUpdate=registry
       Exec=
       PublishPort=80:80
       PublishPort=443:443
       Volume=/etc/nginx/nginx.conf:/etc/nginx/nginx.conf
-      Volume=dfmsite.volume:/var/www/dfmsite
+      Mount=type=image,src=docker.io/dfmsite:latest,dst=/var/www/dfmsite
 
 runcmd:
-  # - systemctl enable podman-auto-update.timer
-  - systemctl enable nginx
-  - systemctl enable dfmsite
+  - systemctl enable nginx.service
+  - systemctl enable dfmsite.service
+  - systemctl enable podman-auto-update.service
+  - systemctl enable podman-auto-update.timer
