@@ -197,7 +197,40 @@ write_files:
       Volume=/var/www/letsencrypt:/var/www/letsencrypt:z,ro
       Volume=/etc/letsencrypt:/etc/letsencrypt:z,ro
 
+  - path: /etc/systemd/system/certbot-renew.timer
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=Run Certbot renewal script
+
+      [Timer]
+      OnCalendar=daily
+      RandomizedDelaySec=1h
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+  - path: /etc/systemd/system/certbot-renew.service
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=Renew SSL certificates with Certbot
+
+      [Install]
+      WantedBy=multi-user.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/podman run -it --rm --name certbot -v "/etc/letsencrypt:/etc/letsencrypt:z" -v "/var/lib/letsencrypt:/var/lib/letsencrypt:z" -v "/var/www/letsencrypt:/var/www/letsencrypt:z" certbot/certbot renew
+
 runcmd:
   - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt/.well-known/acme-challenge
   - systemctl enable podman-auto-update.service
   - systemctl enable podman-auto-update.timer
+  - systemctl start podman-auto-update.timer
+  - systemctl enable certbot-renew.service
+  - systemctl enable certbot-renew.timer
+  - systemctl start certbot-renew.timer
