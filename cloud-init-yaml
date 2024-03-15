@@ -149,6 +149,10 @@ write_files:
             ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
             proxy_cache dfmsite;
+            add_header X-Cache-Status $upstream_cache_status;
+
+            # !! remove when vinxi bundles favicons correctly.
+            rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
 
             location / {
               set $upstream "http://systemd-dfmsite.dns.podman:3000";
