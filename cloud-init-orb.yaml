@@ -136,7 +136,7 @@ write_files:
       Exec=
       PublishPort=80:80
       PublishPort=443:443
-      Volume=/etc/nginx/nginx.conf:/etc/nginx/nginx.conf
+      Volume=/etc/nginx/nginx.conf:/etc/nginx/nginx.conf:z,ro
       Mount=type=image,src=docker.io/dfmsite:latest,dst=/var/www/dfmsite
 
 runcmd:

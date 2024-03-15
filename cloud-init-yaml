@@ -7,8 +7,7 @@ locale: en_US.UTF-8
 timezone: Europe/Amsterdam
 
 packages:
-  - htop
-  - neovim
+  - vim
   - podman
 
 write_files:
@@ -190,13 +189,11 @@ write_files:
       Exec=
       PublishPort=80:80
       PublishPort=443:443
-      Volume=/etc/nginx/nginx.conf:/etc/nginx/nginx.conf
-      Volume=/var/www/letsencrypt:/var/www/letsencrypt
+      Volume=/etc/nginx/nginx.conf:/etc/nginx/nginx.conf:z,ro
+      Volume=/var/www/letsencrypt:/var/www/letsencrypt:z,ro
       Volume=/etc/letsencrypt:/etc/letsencrypt:z,ro
 
 runcmd:
-  - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt
-  - systemctl enable nginx.service
-  - systemctl enable dfmsite.service
+  - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt/.well-known/acme-challenge
   - systemctl enable podman-auto-update.service
   - systemctl enable podman-auto-update.timer
