@@ -123,6 +123,8 @@ write_files:
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
 
             location / {
+              proxy_request_buffering off;
+              proxy_buffering off;
               set $upstream "http://dinxperfm.freeddns.org:8082";
               proxy_pass $upstream;
             }
@@ -186,6 +188,9 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
+
+      [Service]
+      ExecReload=/usr/bin/podman exec systemd-nginx /usr/sbin/nginx -s reload
 
       [Container]
       Image=docker.io/nginx
