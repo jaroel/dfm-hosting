@@ -153,9 +153,6 @@ write_files:
             proxy_cache dfmsite;
             add_header X-Cache-Status $upstream_cache_status;
 
-            # !! remove when vinxi bundles favicons correctly.
-            rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
-
             location / {
               set $upstream "http://systemd-dfmsite.dns.podman:3000";
               proxy_pass $upstream;
