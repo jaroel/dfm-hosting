@@ -189,6 +189,7 @@ write_files:
       AutoUpdate=local
       Exec=
       ReadOnly=true
+      Environment=ORIGIN=https://www-dinxperfm-nl.toffe.site
 
   - path: /etc/containers/systemd/nginx.container
     owner: root:root
