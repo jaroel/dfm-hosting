@@ -63,15 +63,27 @@ write_files:
           default_type        application/octet-stream;
           gzip on;
           gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript application/x-javascript;
-          gzip_static on;
-          proxy_cache_path /var/nginx/cache keys_zone=dfmsite:10m;
+          proxy_cache_path /var/cache/nginx/ keys_zone=dfmsite:10m;
+          proxy_cache_revalidate on;
+          proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+          proxy_cache_background_update on;
+          proxy_cache_lock on;
           proxy_request_buffering off;
-          proxy_buffering off;
+          ssl_session_cache    shared:SSL:1m;
+          ssl_session_timeout  10m;
 
           server {
               listen 80 default_server;
               listen [::]:80 default_server;
               server_name _;
+              return 404;
+          }
+
+            server {
+              listen 443 ssl default_server;
+              listen [::]:443 ssl default_server;
+              server_name _;
+              ssl_reject_handshake on;
               return 404;
           }
 
@@ -123,6 +135,8 @@ write_files:
 
             ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+
+            proxy_connect_timeout 3s;
 
             location / {
               set $upstream "http://dinxperfm.freeddns.org:8082";
