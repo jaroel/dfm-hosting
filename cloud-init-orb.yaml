@@ -9,7 +9,7 @@ timezone: Europe/Amsterdam
 packages:
   - vim
   - podman
-  - iptables-services
+  - nftables
 
 write_files:
   - path: /etc/sysconfig/nftables.conf
