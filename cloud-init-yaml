@@ -9,8 +9,40 @@ timezone: Europe/Amsterdam
 packages:
   - vim
   - podman
+  - iptables-services
 
 write_files:
+  - path: /etc/sysconfig/nftables.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      flush ruleset
+      table inet nftables_svc {
+        set allowed_protocols {
+          type inet_proto
+          elements = { icmp, icmpv6 }
+        }
+        set allowed_interfaces {
+          type ifname
+          elements = { "lo", "podman0", "veth0", "veth1" }
+        }
+        set allowed_tcp_dports {
+          type inet_service
+          elements = { 21, 22, 80, 443 }
+        }
+        chain allow {
+          ct state established,related accept
+          meta l4proto @allowed_protocols accept
+          iifname @allowed_interfaces accept
+          tcp dport @allowed_tcp_dports accept
+        }
+        chain INPUT {
+          type filter hook input priority filter + 20
+          policy accept
+          jump allow
+          reject with icmpx type port-unreachable
+        }
+      }
   - path: /etc/containers/networks/podman.json
     owner: root:root
     permissions: "0644"
@@ -241,10 +273,8 @@ write_files:
       ExecStart=/usr/bin/podman run -it --rm --name certbot -v "/etc/letsencrypt:/etc/letsencrypt:z" -v "/var/lib/letsencrypt:/var/lib/letsencrypt:z" -v "/var/www/letsencrypt:/var/www/letsencrypt:z" certbot/certbot renew
 
 runcmd:
+  - systemctl enable nftables && systemctl start nftables
   - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt/.well-known/acme-challenge
-  - systemctl enable podman-auto-update.service
-  - systemctl enable podman-auto-update.timer
-  - systemctl start podman-auto-update.timer
-  - systemctl enable certbot-renew.service
-  - systemctl enable certbot-renew.timer
-  - systemctl start certbot-renew.timer
+  - systemctl enable nginx.service dfmsite.service
+  - systemctl enable certbot-renew.service certbot-renew.timer && systemctl start certbot-renew.timer
+  - systemctl enable podman-auto-update.service podman-auto-update.timer && systemctl start podman-auto-update.timer
