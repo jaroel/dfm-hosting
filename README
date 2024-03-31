@@ -21,6 +21,7 @@ alias certbot='podman run -it --rm --name certbot -v "/etc/letsencrypt:/etc/lets
 certbot certonly --webroot -w /var/www/letsencrypt -d www-dinxperfm-nl.toffe.site
 certbot certonly --webroot -w /var/www/letsencrypt -d uitzendinggemist-dinxperfm-nl.toffe.site
 certbot certonly --webroot -w /var/www/letsencrypt -d www-dfmfalk.toffe.site
+certbot certonly --webroot -w /var/www/letsencrypt -d www.jaroel.nl -d jaroel.nl -d www.roelbruggink.nl -d roelbruggink.nl
 chmod -R 755 /etc/letsencrypt/{live,archive}
 
 /var/www/letsencrypt

@@ -57,9 +57,13 @@ write_files:
           {
             "subnet": "10.88.0.0/16",
             "gateway": "10.88.0.1"
+          },
+          {
+            "subnet": "fdfc:77c5:9804:136::/64",
+            "gateway": "fdfc:77c5:9804:136::1"
           }
         ],
-        "ipv6_enabled": false,
+        "ipv6_enabled": true,
         "internal": false,
         "dns_enabled": true,
         "ipam_options": {
@@ -119,53 +123,37 @@ write_files:
           server {
             listen 80;
             listen [::]:80;
-            server_name "uitzendinggemist-dinxperfm-nl.toffe.site";
-
-            location /.well-known/acme-challenge/ {
-              root /var/www/letsencrypt;
-            }
-
-            location / {
-                return 301 https://www-dinxperfm-nl.toffe.site;
-            }
+            server_name uitzendinggemist-dinxperfm-nl.toffe.site;
+            location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+            location / { return 301 https://www-dinxperfm-nl.toffe.site; }
           }
           server {
             listen 443 ssl;
             listen [::]:443 ssl;
             http2 on;
-            server_name "uitzendinggemist-dinxperfm-nl.toffe.site";
-
+            server_name uitzendinggemist-dinxperfm-nl.toffe.site;
             ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
-
-            location / {
-                return 301 https://www-dinxperfm-nl.toffe.site;
-            }
+            return 301 https://www-dinxperfm-nl.toffe.site;
           }
 
           server {
             listen 80;
             listen [::]:80;
-            server_name "stream-dinxperfm-nl.toffe.site";
-
-            location /.well-known/acme-challenge/ {
-              root /var/www/letsencrypt;
-            }
-
-            location / {
-                return 301 https://$host$request_uri;
-            }
+            server_name stream-dinxperfm-nl.toffe.site;
+            location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+            location / { return 301 https://$host$request_uri; }
           }
           server {
             listen 443 ssl;
             listen [::]:443 ssl;
             http2 on;
-            server_name "stream-dinxperfm-nl.toffe.site";
-
+            server_name stream-dinxperfm-nl.toffe.site;
             ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
-
             proxy_connect_timeout 3s;
+
+            if ($host != "stream-dinxperfm-nl.toffe.site") { return 301 https://stream-dinxperfm-nl.toffe.site$request_uri; }
 
             location / {
               set $upstream "http://dinxperfm.freeddns.org:8082";
@@ -176,31 +164,55 @@ write_files:
           server {
             listen 80;
             listen [::]:80;
-            server_name "www-dinxperfm-nl.toffe.site";
-
-            location /.well-known/acme-challenge/ {
-              root /var/www/letsencrypt;
-            }
-
-            location / {
-                return 301 https://$host$request_uri;
-            }
+            server_name www-dinxperfm-nl.toffe.site;
+            location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+            location / { return 301 https://www-dinxperfm-nl.toffe.site$request_uri; }
           }
           server {
             listen 443 ssl;
             listen [::]:443 ssl;
             http2 on;
-            server_name "www-dinxperfm-nl.toffe.site";
+            server_name www-dinxperfm-nl.toffe.site dinxperfm-nl.toffe.site;
             ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
             proxy_cache dfmsite;
             add_header X-Cache-Status $upstream_cache_status;
+
+            if ($host == "dinxperfm-nl.toffe.site") { return 301 https://www-dinxperfm-nl.toffe.site$request_uri; }
 
             # !! remove when vinxi bundles favicons correctly.
             rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
 
             location / {
               set $upstream "http://systemd-dfmsite.dns.podman:3000";
+              proxy_pass $upstream;
+            }
+          }
+
+          server {
+            listen 80;
+            listen [::]:80;
+            server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
+            location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+            location / { return 301 https://www.jaroel.nl$request_uri; }
+          }
+          server {
+            listen 443 ssl;
+            listen [::]:443 ssl;
+            http2 on;
+            server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
+            ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
+            ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+            proxy_cache dfmsite;
+            add_header X-Cache-Status $upstream_cache_status;
+
+            if ($host != "www.jaroel.nl") { return 301 https://www.jaroel.nl$request_uri; }
+
+            # !! remove when vinxi bundles favicons correctly.
+            rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
+
+            location / {
+              set $upstream "http://systemd-jaroelsite.dns.podman:3000";
               proxy_pass $upstream;
             }
           }
@@ -222,6 +234,23 @@ write_files:
       Exec=
       ReadOnly=true
       Environment=ORIGIN=https://www-dinxperfm-nl.toffe.site
+
+  - path: /etc/containers/systemd/jaroelsite.container
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=jaroel - Website
+
+      [Install]
+      WantedBy=multi-user.target
+
+      [Container]
+      Image=docker.io/jaroelsite:latest
+      AutoUpdate=local
+      Exec=
+      ReadOnly=true
+      Environment=ORIGIN=https://www.jaroel.nl
 
   - path: /etc/containers/systemd/nginx.container
     owner: root:root
