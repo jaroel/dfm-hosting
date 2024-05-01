@@ -102,8 +102,13 @@ write_files:
           proxy_cache_background_update on;
           proxy_cache_lock on;
           proxy_request_buffering off;
-          ssl_session_cache    shared:SSL:1m;
-          ssl_session_timeout  10m;
+          ssl_session_timeout 1d;
+          ssl_session_cache shared:SSL:10m;
+          ssl_session_tickets off;
+
+          # modern configuration
+          ssl_protocols TLSv1.3;
+          ssl_prefer_server_ciphers off;
 
           server {
               listen 80 default_server;
