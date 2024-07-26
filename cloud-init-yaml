@@ -193,6 +193,12 @@ write_files:
               set $upstream "http://systemd-dfmsite.dns.podman:3000";
               proxy_pass $upstream;
             }
+
+            location /++stream++/ {
+              proxy_cache off;
+              set $upstream "http://systemd-dfmsite.dns.podman:3000";
+              proxy_pass $upstream;
+            }
           }
 
           server {
