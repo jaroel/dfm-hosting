@@ -102,6 +102,7 @@ write_files:
           proxy_cache_background_update on;
           proxy_cache_lock on;
           proxy_request_buffering off;
+          proxy_buffering off;
           ssl_session_timeout 1d;
           ssl_session_cache shared:SSL:10m;
           ssl_session_tickets off;
