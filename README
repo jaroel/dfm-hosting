@@ -28,3 +28,114 @@ chmod -R 755 /etc/letsencrypt/{live,archive}
 
 
 systemctl reload nginx -> nginx -s reload
+
+
+Safari streaming audio
+======================
+
+I ran into an issue where Safari opened two streams per audio element. One range bytes=0-1 request + one "normal" request.
+What seems to work for me is to actually return a correct mp3 header "ID", combined with sending *only* http header Content-Type "audio/mpeg".
+
+
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  http2 on;
+  server_name stream.example.com;
+
+  # Set default_type audio/mpeg instead of application/octet-stream
+  default_type audio/mpeg;
+
+  location / {
+    if ($http_range ~ ^bytes=0-1$) {
+        add_header Accept-Ranges "bytes";
+        add_header Content-Range "bytes 0-1/*";
+        # Content-Type will be audio/mpeg because of the default_type
+        return 206 "ID";
+    }
+    set $upstream "http://backend.internal.example.com";
+    proxy_pass $upstream;
+  }
+}
+
+
+➤ curl 'https://stream.example.com/1' \
+      -X 'GET' \
+      -H 'Accept: */*' \
+      -H 'Sec-Fetch-Site: cross-site' \
+      -H 'Accept-Language: en-GB,en;q=0.9' \
+      -H 'Accept-Encoding: identity' \
+      -H 'Sec-Fetch-Mode: no-cors' \
+      -H 'Host: stream.example.com' \
+      -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15' \
+      -H 'Referer: https://www.example.com/' \
+      -H 'Connection: Keep-Alive' \
+      -H 'Range: bytes=0-1' \
+      -H 'Sec-Fetch-Dest: audio' \
+      -H 'X-Playback-Session-Id: 8EAC1A71-AD4D-4F23-A701-3A700784DB50' -v
+Note: Unnecessary use of -X or --request, GET is already inferred.
+* Host stream.example.com:443 was resolved.
+* IPv6: 2a02:c206:2172:9922::1
+* IPv4: 213.199.49.98
+*   Trying [2a02:c206:2172:9922::1]:443...
+* Connected to stream.example.com (2a02:c206:2172:9922::1) port 443
+* ALPN: curl offers h2,http/1.1
+* (304) (OUT), TLS handshake, Client hello (1):
+*  CAfile: /etc/ssl/cert.pem
+*  CApath: none
+* (304) (IN), TLS handshake, Server hello (2):
+* (304) (IN), TLS handshake, Unknown (8):
+* (304) (IN), TLS handshake, Certificate (11):
+* (304) (IN), TLS handshake, CERT verify (15):
+* (304) (IN), TLS handshake, Finished (20):
+* (304) (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / AEAD-CHACHA20-POLY1305-SHA256 / [blank] / UNDEF
+* ALPN: server accepted h2
+* Server certificate:
+*  subject: CN=stream.example.com
+*  start date: Jul 13 21:29:29 2024 GMT
+*  expire date: Oct 11 21:29:28 2024 GMT
+*  subjectAltName: host "stream.example.com" matched cert's "stream.example.com"
+*  issuer: C=US; O=Let's Encrypt; CN=E6
+*  SSL certificate verify ok.
+* using HTTP/2
+* [HTTP/2] [1] OPENED stream for https://stream.example.com/1
+* [HTTP/2] [1] [:method: GET]
+* [HTTP/2] [1] [:scheme: https]
+* [HTTP/2] [1] [:authority: stream.example.com]
+* [HTTP/2] [1] [:path: /1]
+* [HTTP/2] [1] [accept: */*]
+* [HTTP/2] [1] [sec-fetch-site: cross-site]
+* [HTTP/2] [1] [accept-language: en-GB,en;q=0.9]
+* [HTTP/2] [1] [accept-encoding: identity]
+* [HTTP/2] [1] [sec-fetch-mode: no-cors]
+* [HTTP/2] [1] [user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15]
+* [HTTP/2] [1] [referer: https://www.example.com/]
+* [HTTP/2] [1] [range: bytes=0-1]
+* [HTTP/2] [1] [sec-fetch-dest: audio]
+* [HTTP/2] [1] [x-playback-session-id: 8EAC1A71-AD4D-4F23-A701-3A700784DB50]
+> GET /1 HTTP/2
+> Host: stream.example.com
+> Accept: */*
+> Sec-Fetch-Site: cross-site
+> Accept-Language: en-GB,en;q=0.9
+> Accept-Encoding: identity
+> Sec-Fetch-Mode: no-cors
+> User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15
+> Referer: https://www.example.com/
+> Connection: Keep-Alive
+> Range: bytes=0-1
+> Sec-Fetch-Dest: audio
+> X-Playback-Session-Id: 8EAC1A71-AD4D-4F23-A701-3A700784DB50
+>
+* Request completely sent off
+< HTTP/2 206
+< server: nginx/1.27.1
+< date: Sun, 01 Sep 2024 12:28:31 GMT
+< content-type: audio/mpeg
+< content-length: 2
+< accept-ranges: bytes
+< content-range: bytes 0-1/*
+<
+* Connection #0 to host stream.example.com left intact
+ID⏎                                                                                                                                                                                                                                                                                                                            roel@macdaddy:~
