@@ -13,14 +13,12 @@ tail /var/log/cloud-init-output.log
 
 # docker build --platform linux/amd64 -t dfmsite:latest .
 
-docker save dfmsite:latest | bzip2 | pv | ssh root@www-dinxperfm-nl.toffe.site podman load
+docker save dfmsite:latest | bzip2 | pv | ssh root@web1.toffe.site podman load
 docker save dfmuzg:latest | bzip2 | pv | ssh root@fedora@orb podman load
 
 # Request new certificate
 alias certbot='podman run -it --rm --name certbot -v "/etc/letsencrypt:/etc/letsencrypt:z" -v "/var/lib/letsencrypt:/var/lib/letsencrypt:z" -v "/var/www/letsencrypt:/var/www/letsencrypt:z" certbot/certbot'
-certbot certonly --webroot -w /var/www/letsencrypt -d www-dinxperfm-nl.toffe.site
-certbot certonly --webroot -w /var/www/letsencrypt -d uitzendinggemist-dinxperfm-nl.toffe.site
-certbot certonly --webroot -w /var/www/letsencrypt -d www-dfmfalk.toffe.site
+certbot certonly --webroot -w /var/www/letsencrypt -d www.dinxperfm.nl
 certbot certonly --webroot -w /var/www/letsencrypt -d www.jaroel.nl -d jaroel.nl -d www.roelbruggink.nl -d roelbruggink.nl
 chmod -R 755 /etc/letsencrypt/{live,archive}
 
