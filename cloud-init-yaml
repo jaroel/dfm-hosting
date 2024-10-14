@@ -129,7 +129,7 @@ write_files:
           server {
             listen 80;
             listen [::]:80;
-            server_name www.dinxperfm.nl dinxperfm.nl;
+            server_name stream.dinxperfm.nl;
             location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
             location / { return 301 https://$host$request_uri; }
           }
@@ -137,13 +137,13 @@ write_files:
             listen 443 ssl;
             listen [::]:443 ssl;
             http2 on;
-            server_name www.dinxperfm.nl dinxperfm.nl;
+            server_name "stream.dinxperfm.nl";
             ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
             proxy_connect_timeout 3s;
             default_type audio/mpeg;
 
-            if ($host != "www.dinxperfm.nl") { return 301 https://www.dinxperfm.nl$request_uri; }
+            if ($host != "stream.dinxperfm.nl") { return 301 https://stream.dinxperfm.nl$request_uri; }
 
             location / {
               if ($http_range ~ ^bytes=0-1$) {
