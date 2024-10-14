@@ -141,17 +141,11 @@ write_files:
             ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
             ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
             proxy_connect_timeout 3s;
-            default_type audio/mpeg;
 
             if ($host != "stream.dinxperfm.nl") { return 301 https://stream.dinxperfm.nl$request_uri; }
 
             location / {
-              if ($http_range ~ ^bytes=0-1$) {
-                  add_header Accept-Ranges "bytes";
-                  add_header Content-Range "bytes 0-1/*";
-                  return 206 "ID";
-              }
-              set $upstream "http://dinxperfm.freeddns.org:8082";
+              set $upstream "http://systemd-dfmstreamproxy.dns.podman:3000";
               proxy_pass $upstream;
             }
           }
@@ -181,12 +175,6 @@ write_files:
 
             location / {
               proxy_buffering on;
-              set $upstream "http://systemd-dfmsite.dns.podman:3000";
-              proxy_pass $upstream;
-            }
-
-            location /++stream++/ {
-              proxy_cache off;
               set $upstream "http://systemd-dfmsite.dns.podman:3000";
               proxy_pass $upstream;
             }
@@ -220,6 +208,22 @@ write_files:
             }
           }
       }
+
+  - path: /etc/containers/systemd/dfmstreamproxy.container
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=DinxperFM - Stream proxy
+
+      [Install]
+      WantedBy=multi-user.target
+
+      [Container]
+      Image=docker.io/dfmstreamproxy:latest
+      AutoUpdate=local
+      Exec=
+      ReadOnly=true
 
   - path: /etc/containers/systemd/dfmsite.container
     owner: root:root
