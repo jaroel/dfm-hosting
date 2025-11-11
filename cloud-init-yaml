@@ -16,7 +16,6 @@ write_files:
     owner: root:root
     permissions: "0644"
     content: |
-      flush ruleset
       table inet nftables_svc {
         set allowed_protocols {
           type inet_proto
@@ -28,7 +27,7 @@ write_files:
         }
         set allowed_tcp_dports {
           type inet_service
-          elements = { 21, 22, 80, 443 }
+          elements = { 22, 80, 443 }
         }
         chain allow {
           ct state established,related accept
@@ -43,6 +42,7 @@ write_files:
           reject with icmpx type port-unreachable
         }
       }
+
   - path: /etc/containers/networks/podman.json
     owner: root:root
     permissions: "0644"
@@ -86,144 +86,133 @@ write_files:
       }
 
       http {
-          access_log off;
-          resolver 10.88.0.1;  # !! DNS server for podman network
-          sendfile            on;
-          tcp_nopush          on;
-          keepalive_timeout   65;
-          types_hash_max_size 4096;
-          include             /etc/nginx/mime.types;
-          default_type        application/octet-stream;
-          gzip on;
-          gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript application/x-javascript;
-          proxy_cache_path /var/cache/nginx/ keys_zone=dfmsite:10m;
-          proxy_cache_revalidate on;
-          proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
-          proxy_cache_background_update on;
-          proxy_cache_lock on;
-          proxy_request_buffering off;
-          proxy_buffering on;
-          ssl_session_timeout 1d;
-          ssl_session_cache shared:SSL:10m;
-          ssl_session_tickets off;
+        access_log off;
+        resolver 10.88.0.1;  # !! DNS server for podman network
+        sendfile            on;
+        tcp_nopush          on;
+        keepalive_timeout   65;
+        types_hash_max_size 4096;
+        include             /etc/nginx/mime.types;
+        default_type        application/octet-stream;
+        gzip on;
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript application/x-javascript;
+        proxy_cache_path /var/cache/nginx/ keys_zone=dfmsite:10m;
+        proxy_cache_revalidate on;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_cache_background_update on;
+        proxy_cache_lock on;
+        proxy_request_buffering off;
+        proxy_buffering on;
+        ssl_session_timeout 1d;
+        ssl_session_cache shared:SSL:10m;  # about 40000 sessions
+        ssl_session_tickets off;
+        ssl_protocols TLSv1.3;
+        ssl_prefer_server_ciphers off;
+        ssl_early_data on;
 
-          # modern configuration
-          ssl_protocols TLSv1.3;
-          ssl_prefer_server_ciphers off;
+        server {
+          listen 80 default_server;
+          listen [::]:80 default_server;
+          server_name _;
+          return 404;
+        }
 
-          server {
-              listen 80 default_server;
-              listen [::]:80 default_server;
-              server_name _;
-              return 404;
-          }
+        server {
+          listen 443 ssl default_server;
+          listen [::]:443 ssl default_server;
+          server_name _;
+          ssl_reject_handshake on;
+          return 404;
+        }
 
-            server {
-              listen 443 ssl default_server;
-              listen [::]:443 ssl default_server;
-              server_name _;
-              ssl_reject_handshake on;
-              return 404;
-          }
+        server {
+          listen 80;
+          listen [::]:80;
+          server_name stream.dinxperfm.nl;
+          location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+          location / { return 301 https://stream.dinxperfm.nl$request_uri; }
+        }
+        server {
+          listen 443 ssl;
+          listen [::]:443 ssl;
+          http2 on;
+          server_name "stream.dinxperfm.nl";
+          ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+          proxy_connect_timeout 3s;
+          default_type audio/mpeg;
 
-          server {
-            listen 80;
-            listen [::]:80;
-            server_name stream.dinxperfm.nl;
-            location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
-            location / { return 301 https://$host$request_uri; }
-          }
-          server {
-            listen 443 ssl;
-            listen [::]:443 ssl;
-            http2 on;
-            server_name "stream.dinxperfm.nl";
-            ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
-            ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
-            proxy_connect_timeout 3s;
+          if ($host != "stream.dinxperfm.nl") { return 301 https://stream.dinxperfm.nl$request_uri; }
 
-            if ($host != "stream.dinxperfm.nl") { return 301 https://stream.dinxperfm.nl$request_uri; }
-
-            location / {
-              set $upstream "http://systemd-dfmstreamproxy.dns.podman:3000";
-              proxy_pass $upstream;
+          location / {
+            if ($http_range ~ ^bytes=0-1$) {
+              add_header Accept-Ranges "bytes";
+              add_header Content-Range "bytes 0-1/*";
+              return 206 "ID";
             }
+            set $upstream "http://dinxperfm.freeddns.org:8082";
+            proxy_pass $upstream;
           }
+        }
 
-          server {
-            listen 80;
-            listen [::]:80;
-            server_name www.dinxperfm.nl;
-            location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
-            location / { return 301 https://www.dinxperfm.nl$request_uri; }
+        server {
+          listen 80;
+          listen [::]:80;
+          server_name www.dinxperfm.nl dinxperfm.nl;
+          location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+          location / { return 301 https://www.dinxperfm.nl$request_uri; }
+        }
+        server {
+          listen 443 ssl;
+          listen [::]:443 ssl;
+          http2 on;
+          server_name www.dinxperfm.nl dinxperfm.nl;
+          ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+          proxy_cache dfmsite;
+          proxy_connect_timeout 3s;
+          proxy_buffering off;
+          add_header X-Cache-Status $upstream_cache_status;
+
+          if ($host != "www.dinxperfm.nl") { return 301 https://www.dinxperfm.nl$request_uri; }
+
+          # !! remove when vinxi bundles favicons correctly.
+          rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
+
+          location / {
+            proxy_buffering on;
+            set $upstream "http://systemd-dfmsite.dns.podman:3000";
+            proxy_pass $upstream;
           }
-          server {
-            listen 443 ssl;
-            listen [::]:443 ssl;
-            http2 on;
-            server_name www.dinxperfm.nl dinxperfm.nl;
-            ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
-            ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
-            proxy_cache dfmsite;
-            proxy_buffering off;
-            add_header X-Cache-Status $upstream_cache_status;
+        }
+        server {
+          listen 80;
+          listen [::]:80;
+          server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
+          location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+          location / { return 301 https://www.jaroel.nl$request_uri; }
+        }
+        server {
+          listen 443 ssl;
+          listen [::]:443 ssl;
+          http2 on;
+          server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
+          ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+          proxy_cache dfmsite;
+          add_header X-Cache-Status $upstream_cache_status;
 
-            if ($host == "dinxperfm.nl") { return 301 https://www.dinxperfm.nl$request_uri; }
+          if ($host != "www.jaroel.nl") { return 301 https://www.jaroel.nl$request_uri; }
 
-            # !! remove when vinxi bundles favicons correctly.
-            rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
+          # !! remove when vinxi bundles favicons correctly.
+          rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
 
-            location / {
-              proxy_buffering on;
-              set $upstream "http://systemd-dfmsite.dns.podman:3000";
-              proxy_pass $upstream;
-            }
+          location / {
+            set $upstream "http://systemd-jaroelsite.dns.podman:3000";
+            proxy_pass $upstream;
           }
-
-          server {
-            listen 80;
-            listen [::]:80;
-            server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
-            location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
-            location / { return 301 https://www.jaroel.nl$request_uri; }
-          }
-          server {
-            listen 443 ssl;
-            listen [::]:443 ssl;
-            http2 on;
-            server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
-            ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
-            ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
-            proxy_cache dfmsite;
-            add_header X-Cache-Status $upstream_cache_status;
-
-            if ($host != "www.jaroel.nl") { return 301 https://www.jaroel.nl$request_uri; }
-
-            # !! remove when vinxi bundles favicons correctly.
-            rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
-
-            location / {
-              set $upstream "http://systemd-jaroelsite.dns.podman:3000";
-              proxy_pass $upstream;
-            }
-          }
+        }
       }
-
-  - path: /etc/containers/systemd/dfmstreamproxy.container
-    owner: root:root
-    permissions: "0755"
-    content: |
-      [Unit]
-      Description=DinxperFM - Stream proxy
-
-      [Install]
-      WantedBy=multi-user.target
-
-      [Container]
-      Image=docker.io/dfmstreamproxy:latest
-      AutoUpdate=local
-      Exec=
-      ReadOnly=true
 
   - path: /etc/containers/systemd/dfmsite.container
     owner: root:root
@@ -235,12 +224,15 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
+      [Service]
+      Restart=on-failure
+
       [Container]
       Image=docker.io/dfmsite:latest
       AutoUpdate=local
       Exec=
       ReadOnly=true
-      Environment=ORIGIN=https://www.dinxperfm.nl
+      Environment=ORIGIN=https://www.dinxperfm.nl/
 
   - path: /etc/containers/systemd/jaroelsite.container
     owner: root:root
@@ -252,12 +244,15 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
+      [Service]
+      Restart=on-failure
+
       [Container]
       Image=docker.io/jaroelsite:latest
       AutoUpdate=local
       Exec=
       ReadOnly=true
-      Environment=ORIGIN=https://www.jaroel.nl
+      Environment=ORIGIN=https://www.jaroel.nl/
 
   - path: /etc/containers/systemd/nginx.container
     owner: root:root
@@ -271,6 +266,7 @@ write_files:
 
       [Service]
       ExecReload=/usr/bin/podman exec systemd-nginx /usr/sbin/nginx -s reload
+      Restart=on-failure
 
       [Container]
       Image=docker.io/nginx
