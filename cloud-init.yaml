@@ -49,10 +49,8 @@ write_files:
     content: |
       {
         "name": "podman",
-        "id": "2f259bab93aaaaa2542ba43ef33eb990d0999ee1b9924b557b7be53c0b7a1bb9",
         "driver": "bridge",
         "network_interface": "podman0",
-        "created": "2024-03-13T19:40:29.895534643+01:00",
         "subnets": [
           {
             "subnet": "10.88.0.0/16",
@@ -260,6 +258,8 @@ write_files:
     content: |
       [Unit]
       Description=nginx
+      After=podman.service
+      Requires=podman.service      
 
       [Install]
       WantedBy=multi-user.target
@@ -305,11 +305,12 @@ write_files:
 
       [Service]
       Type=oneshot
-      ExecStart=/usr/bin/podman run -it --rm --name certbot -v "/etc/letsencrypt:/etc/letsencrypt:z" -v "/var/lib/letsencrypt:/var/lib/letsencrypt:z" -v "/var/www/letsencrypt:/var/www/letsencrypt:z" certbot/certbot renew
+      ExecStart=/usr/bin/podman run --rm --name certbot -v "/etc/letsencrypt:/etc/letsencrypt:z" -v "/var/lib/letsencrypt:/var/lib/letsencrypt:z" -v "/var/www/letsencrypt:/var/www/letsencrypt:z" certbot/certbot renew
 
 runcmd:
   - systemctl enable nftables && systemctl start nftables
   - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt/.well-known/acme-challenge
+  - systemctl daemon-reload
   - systemctl enable nginx.service dfmsite.service
   - systemctl enable certbot-renew.service certbot-renew.timer && systemctl start certbot-renew.timer
   - systemctl enable podman-auto-update.service podman-auto-update.timer && systemctl start podman-auto-update.timer
