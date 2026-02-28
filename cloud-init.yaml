@@ -77,8 +77,6 @@ write_files:
       error_log /var/log/nginx/error.log;
       pid /run/nginx.pid;
 
-      include /usr/share/nginx/modules/*.conf;
-
       events {
           worker_connections 1024;
       }
@@ -94,25 +92,27 @@ write_files:
         default_type        application/octet-stream;
         gzip on;
         gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript application/x-javascript;
-        proxy_cache_path /var/cache/nginx/ keys_zone=dfmsite:10m;
+        proxy_cache_path /var/cache/nginx/dfmsite keys_zone=dfmsite:10m;
+        proxy_cache_path /var/cache/nginx/jaroelsite keys_zone=jaroelsite:10m;
         proxy_cache_revalidate on;
         proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
         proxy_cache_background_update on;
-        proxy_cache_lock on;
-        proxy_request_buffering off;
+        proxy_cache_lock off;
         proxy_buffering on;
         ssl_session_timeout 1d;
         ssl_session_cache shared:SSL:10m;  # about 40000 sessions
         ssl_session_tickets off;
         ssl_protocols TLSv1.3;
+        ssl_ecdh_curve X25519:prime256v1:secp384r1;
         ssl_prefer_server_ciphers off;
-        ssl_early_data on;
+        ssl_early_data off;
+        add_header Strict-Transport-Security "max-age=63072000" always;
 
         server {
           listen 80 default_server;
           listen [::]:80 default_server;
           server_name _;
-          return 404;
+          return 301 https://$host$request_uri;
         }
 
         server {
@@ -138,9 +138,8 @@ write_files:
           ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
           ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
           proxy_connect_timeout 3s;
+          proxy_http_version 1.1;
           default_type audio/mpeg;
-
-          if ($host != "stream.dinxperfm.nl") { return 301 https://stream.dinxperfm.nl$request_uri; }
 
           location / {
             if ($http_range ~ ^bytes=0-1$) {
@@ -148,8 +147,14 @@ write_files:
               add_header Content-Range "bytes 0-1/*";
               return 206 "ID";
             }
-            set $upstream "http://dinxperfm.freeddns.org:8082";
-            proxy_pass $upstream;
+            proxy_pass "http://dinxperfm.freeddns.org:8082";
+            proxy_request_buffering off;
+            proxy_buffering off;
+            proxy_connect_timeout 5s;
+
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           }
         }
 
@@ -169,16 +174,13 @@ write_files:
           ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
           proxy_cache dfmsite;
           proxy_connect_timeout 3s;
-          proxy_buffering off;
+          proxy_http_version 1.1;
           add_header X-Cache-Status $upstream_cache_status;
-
-          if ($host != "www.dinxperfm.nl") { return 301 https://www.dinxperfm.nl$request_uri; }
 
           # !! remove when vinxi bundles favicons correctly.
           rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
 
           location / {
-            proxy_buffering on;
             set $upstream "http://systemd-dfmsite.dns.podman:3000";
             proxy_pass $upstream;
           }
@@ -197,10 +199,9 @@ write_files:
           server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
           ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
           ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
-          proxy_cache dfmsite;
+          proxy_cache jaroelsite;
           add_header X-Cache-Status $upstream_cache_status;
-
-          if ($host != "www.jaroel.nl") { return 301 https://www.jaroel.nl$request_uri; }
+          proxy_http_version 1.1;
 
           # !! remove when vinxi bundles favicons correctly.
           rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
@@ -259,7 +260,7 @@ write_files:
       [Unit]
       Description=nginx
       After=podman.service
-      Requires=podman.service      
+      Requires=podman.service
 
       [Install]
       WantedBy=multi-user.target
