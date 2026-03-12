@@ -141,6 +141,8 @@ write_files:
           proxy_http_version 1.1;
           default_type audio/mpeg;
 
+          if ($host != "stream.dinxperfm.nl") { return 301 https://stream.dinxperfm.nl$request_uri; }
+
           location / {
             if ($http_range ~ ^bytes=0-1$) {
               add_header Accept-Ranges "bytes";
@@ -177,6 +179,8 @@ write_files:
           proxy_http_version 1.1;
           add_header X-Cache-Status $upstream_cache_status;
 
+          if ($host != "www.dinxperfm.nl") { return 301 https://www.dinxperfm.nl$request_uri; }
+
           # !! remove when vinxi bundles favicons correctly.
           rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
 
@@ -202,6 +206,8 @@ write_files:
           proxy_cache jaroelsite;
           add_header X-Cache-Status $upstream_cache_status;
           proxy_http_version 1.1;
+
+          if ($host != "www.jaroel.nl") { return 301 https://www.jaroel.nl$request_uri; }
 
           # !! remove when vinxi bundles favicons correctly.
           rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
