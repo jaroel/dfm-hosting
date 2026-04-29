@@ -16,30 +16,17 @@ write_files:
     owner: root:root
     permissions: "0644"
     content: |
-      table inet nftables_svc {
-        set allowed_protocols {
-          type inet_proto
-          elements = { icmp, icmpv6 }
-        }
-        set allowed_interfaces {
-          type ifname
-          elements = { "lo", "podman0", "veth0", "veth1" }
-        }
-        set allowed_tcp_dports {
-          type inet_service
-          elements = { 22, 80, 443 }
-        }
-        chain allow {
+      table inet filter {
+        chain input {
+          type filter hook input priority 0;
+          policy accept;
+
           ct state established,related accept
-          meta l4proto @allowed_protocols accept
-          iifname @allowed_interfaces accept
-          tcp dport @allowed_tcp_dports accept
-        }
-        chain INPUT {
-          type filter hook input priority filter + 20
-          policy accept
-          jump allow
-          reject with icmpx type port-unreachable
+          iif lo accept
+
+          tcp dport { 22, 80, 443 } accept
+          ip protocol icmp accept
+          ip6 nexthdr icmpv6 accept
         }
       }
 
@@ -62,11 +49,7 @@ write_files:
           }
         ],
         "ipv6_enabled": true,
-        "internal": false,
-        "dns_enabled": true,
-        "ipam_options": {
-          "driver": "host-local"
-        }
+        "dns_enabled": true
       }
   - path: /etc/nginx/nginx.conf
     owner: root:root
@@ -74,16 +57,12 @@ write_files:
     content: |
       user nginx;
       worker_processes auto;
-      error_log /var/log/nginx/error.log;
-      pid /run/nginx.pid;
 
       events {
           worker_connections 1024;
       }
 
       http {
-        access_log off;
-        resolver 10.88.0.1;  # !! DNS server for podman network
         sendfile            on;
         tcp_nopush          on;
         keepalive_timeout   65;
@@ -120,28 +99,23 @@ write_files:
           listen [::]:443 ssl default_server;
           server_name _;
           ssl_reject_handshake on;
-          return 404;
+          return 444;
         }
 
         server {
           listen 80;
-          listen [::]:80;
           server_name stream.dinxperfm.nl;
-          location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
+          location /.well-known/acme-challenge/ { }
           location / { return 301 https://stream.dinxperfm.nl$request_uri; }
         }
         server {
-          listen 443 ssl;
-          listen [::]:443 ssl;
-          http2 on;
-          server_name "stream.dinxperfm.nl";
-          ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
-          ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+          listen 443 ssl http2;
+          server_name stream.dinxperfm.nl;
+          ssl_certificate /etc/letsencrypt/live/stream.dinxperfm.nl/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/stream.dinxperfm.nl/privkey.pem;
           proxy_connect_timeout 3s;
           proxy_http_version 1.1;
           default_type audio/mpeg;
-
-          if ($host != "stream.dinxperfm.nl") { return 301 https://stream.dinxperfm.nl$request_uri; }
 
           location / {
             if ($http_range ~ ^bytes=0-1$) {
@@ -149,60 +123,49 @@ write_files:
               add_header Content-Range "bytes 0-1/*";
               return 206 "ID";
             }
-            proxy_pass "http://dinxperfm.freeddns.org:8082";
-            proxy_request_buffering off;
+            proxy_pass http://dinxperfm.freeddns.org:8082;
             proxy_buffering off;
-            proxy_connect_timeout 5s;
-
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_request_buffering off;
           }
         }
 
+        upstream dfmsite {
+          server 127.0.0.1:3001;
+        }
         server {
           listen 80;
-          listen [::]:80;
           server_name www.dinxperfm.nl dinxperfm.nl;
           location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
           location / { return 301 https://www.dinxperfm.nl$request_uri; }
         }
+
         server {
-          listen 443 ssl;
-          listen [::]:443 ssl;
-          http2 on;
+          listen 443 ssl http2;
           server_name www.dinxperfm.nl dinxperfm.nl;
-          ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
-          ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
-          proxy_cache dfmsite;
-          proxy_connect_timeout 3s;
-          proxy_http_version 1.1;
-          add_header X-Cache-Status $upstream_cache_status;
-
-          if ($host != "www.dinxperfm.nl") { return 301 https://www.dinxperfm.nl$request_uri; }
-
-          # !! remove when vinxi bundles favicons correctly.
-          rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
+          ssl_certificate /etc/letsencrypt/live/www.dinxperfm.nl/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/www.dinxperfm.nl/privkey.pem;
 
           location / {
-            set $upstream "http://systemd-dfmsite.dns.podman:3000";
-            proxy_pass $upstream;
+            proxy_pass http://dfmsite;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
           }
+        }
+
+        upstream jaroelsite {
+          server 127.0.0.1:3002;
         }
         server {
           listen 80;
-          listen [::]:80;
           server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
           location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }
           location / { return 301 https://www.jaroel.nl$request_uri; }
         }
         server {
-          listen 443 ssl;
-          listen [::]:443 ssl;
-          http2 on;
+          listen 443 ssl http2;
           server_name www.jaroel.nl jaroel.nl www.roelbruggink.nl roelbruggink.nl;
-          ssl_certificate /etc/letsencrypt/live/$host/fullchain.pem;
-          ssl_certificate_key /etc/letsencrypt/live/$host/privkey.pem;
+          ssl_certificate /etc/letsencrypt/live/www.jaroel.nl/fullchain.pem;
+          ssl_certificate_key /etc/letsencrypt/live/www.jaroel.nl/privkey.pem;
           proxy_cache jaroelsite;
           add_header X-Cache-Status $upstream_cache_status;
           proxy_http_version 1.1;
@@ -213,8 +176,9 @@ write_files:
           rewrite ^\/_build\/assets\/favicon-(.*).ico$ /assets/favicon-$1.ico last;
 
           location / {
-            set $upstream "http://systemd-jaroelsite.dns.podman:3000";
-            proxy_pass $upstream;
+            proxy_pass http://jaroelsite;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
           }
         }
       }
@@ -236,6 +200,7 @@ write_files:
       Image=docker.io/dfmsite:latest
       AutoUpdate=local
       Exec=
+      PublishPort=127.0.0.1:3001:3000
       ReadOnly=true
       Environment=ORIGIN=https://www.dinxperfm.nl/
 
@@ -257,6 +222,7 @@ write_files:
       AutoUpdate=local
       Exec=
       ReadOnly=true
+      PublishPort=127.0.0.1:3002:3000
       Environment=ORIGIN=https://www.jaroel.nl/
 
   - path: /etc/containers/systemd/nginx.container
@@ -264,7 +230,7 @@ write_files:
     permissions: "0755"
     content: |
       [Unit]
-      Description=nginx
+      Description=nginx reverse proxy
       After=podman.service
       Requires=podman.service
 
@@ -278,9 +244,7 @@ write_files:
       [Container]
       Image=docker.io/nginx
       AutoUpdate=registry
-      Exec=
-      PublishPort=80:80
-      PublishPort=443:443
+      Network=host
       Volume=/etc/nginx/nginx.conf:/etc/nginx/nginx.conf:z,ro
       Volume=/var/www/letsencrypt:/var/www/letsencrypt:z,ro
       Volume=/etc/letsencrypt:/etc/letsencrypt:z,ro
@@ -290,11 +254,10 @@ write_files:
     permissions: "0755"
     content: |
       [Unit]
-      Description=Run Certbot renewal script
+      Description=Daily certbot renewal
 
       [Timer]
       OnCalendar=daily
-      RandomizedDelaySec=1h
       Persistent=true
 
       [Install]
@@ -305,19 +268,21 @@ write_files:
     permissions: "0755"
     content: |
       [Unit]
-      Description=Renew SSL certificates with Certbot
-
-      [Install]
-      WantedBy=multi-user.target
+      Description=Renew SSL certificates
 
       [Service]
       Type=oneshot
-      ExecStart=/usr/bin/podman run --rm --name certbot -v "/etc/letsencrypt:/etc/letsencrypt:z" -v "/var/lib/letsencrypt:/var/lib/letsencrypt:z" -v "/var/www/letsencrypt:/var/www/letsencrypt:z" certbot/certbot renew
-
+      ExecStart=/usr/bin/podman run --rm \
+        --name certbot \
+        -v /etc/letsencrypt:/etc/letsencrypt:z \
+        -v /var/www/letsencrypt:/var/www/letsencrypt:z \
+        certbot/certbot renew
 runcmd:
-  - systemctl enable nftables && systemctl start nftables
+  - systemctl enable nftables
+  - systemctl start nftables
   - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt/.well-known/acme-challenge
   - systemctl daemon-reload
-  - systemctl enable nginx.service dfmsite.service
+  - systemctl enable nginx.service dfmsite.service jaroelsite.service
+  - systemctl restart nginx.service
   - systemctl enable certbot-renew.service certbot-renew.timer && systemctl start certbot-renew.timer
   - systemctl enable podman-auto-update.service podman-auto-update.timer && systemctl start podman-auto-update.timer
