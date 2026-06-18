@@ -294,12 +294,24 @@ write_files:
       PublishPort=127.0.0.1:3002:3000
       Environment=ORIGIN=https://www.jaroel.nl/
 
+  - path: /etc/containers/systemd/sbdg.network
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=SBDG network
+
+      [Network]
+      NetworkName=sbdg
+
   - path: /etc/containers/systemd/sbdgsite.container
     owner: root:root
     permissions: "0755"
     content: |
       [Unit]
       Description=SBDG - Website
+      Requires=sbdgredis.service
+      After=sbdgredis.service
 
       [Install]
       WantedBy=multi-user.target
@@ -310,6 +322,7 @@ write_files:
 
       [Container]
       Image=docker.io/sbdgsite:latest
+      Network=sbdg.network
       AutoUpdate=local
       Exec=
       PublishPort=127.0.0.1:3003:8000
@@ -317,6 +330,26 @@ write_files:
       Environment=SECRET_KEY=
       Volume=/srv/containers/sbdgsite/media:/app/src/media:z
       Volume=/srv/containers/sbdgsite/db:/app/src/db:z
+
+  - path: /etc/containers/systemd/sbdgredis.container
+    owner: root:root
+    permissions: "0755"
+    content: |
+      [Unit]
+      Description=SBDG - Redis
+
+      [Install]
+      WantedBy=multi-user.target
+
+      [Service]
+      Restart=on-failure
+
+      [Container]
+      Image=docker.io/redis:8
+      Network=sbdg.network
+      AutoUpdate=registry
+      ReadOnly=true
+      Volume=/srv/containers/sbdgredis/data:/data:z
 
   - path: /etc/containers/systemd/nginx.container
     owner: root:root
@@ -375,7 +408,8 @@ runcmd:
   - systemctl enable nftables
   - systemctl start nftables
   - mkdir -p /etc/letsencrypt/{live,archive} -p /var/lib/letsencrypt -p /var/www/letsencrypt/.well-known/acme-challenge
-  - mkdir -p /srv/containers/sbdgsite/{media,static,db}
+  - mkdir -p /srv/containers/sbdgsite/{media,db}
+  - mkdir -p /srv/containers/sbdgredis/data/
   - systemctl daemon-reload
   - systemctl enable nginx.service dfmsite.service jaroelsite.service sbdgsite.service
   - systemctl restart nginx.service
